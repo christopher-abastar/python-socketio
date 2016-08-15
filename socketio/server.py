@@ -346,9 +346,19 @@ class Server(object):
             data = list(data)
         else:
             data = [data]
-        self._send_packet(sid, packet.Packet(packet.EVENT, namespace=namespace,
-                                             data=[event] + data, id=id,
-                                             binary=binary))
+
+        try:
+            self._send_packet(sid, packet.Packet(packet.EVENT, namespace=namespace,
+                                                 data=[event] + data, id=id,
+                                                 binary=binary))
+        except:
+            self.logger.error('error in _emit_internal %s', sid)
+            try:
+                self._trigger_event('disconnect', namespace, sid)
+                self.manager.disconnect(sid, namespace=namespace)
+            except:
+                self.logger.error('error in _emit_internal cleanup %s', sid)
+                pass
 
     def _send_packet(self, sid, pkt):
         """Send a Socket.IO packet to a client."""
