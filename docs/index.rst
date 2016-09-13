@@ -213,6 +213,40 @@ methods in the :class:`socketio.Server` class.
 When the ``namespace`` argument is omitted, set to ``None`` or to ``'/'``, the
 default namespace, representing the physical connection, is used.
 
+Class-Based Namespaces
+----------------------
+
+As an alternative to the decorator-based event handlers, the event handlers
+that belong to a namespace can be created as methods of a subclass of 
+:class:`socketio.Namespace`::
+
+    class MyCustomNamespace(socketio.Namespace):
+        def on_connect(sid, environ):
+            pass
+
+        def on_disconnect(sid):
+            pass
+
+        def on_my_event(sid, data):
+            self.emit('my_response', data)
+
+    sio.register_namespace(MyCustomNamespace('/test'))
+
+When class-based namespaces are used, any events received by the server are
+dispatched to a method named as the event name with the ``on_`` prefix. For
+example, event ``my_event`` will be handled by a method named ``on_my_event``.
+If an event is received for which there is no corresponding method defined in
+the namespace class, then the event is ignored. All event names used in
+class-based namespaces must used characters that are legal in method names.
+
+As a convenience to methods defined in a class-based namespace, the namespace
+instance includes versions of several of the methods in the 
+:class:`socketio.Server` class that default to the proper namespace when the
+``namespace`` argument is not given.
+
+Note: if an event has a handler in a class-based namespace, and also a
+decorator-based function handler, the standalone function handler is invoked.
+
 Using a Message Queue
 ---------------------
 
@@ -394,6 +428,29 @@ functions in the standard library with equivalent asynchronous versions. While
 python-socketio does not require monkey patching, other libraries such as
 database drivers are likely to require it.
 
+Gevent with uWSGI
+~~~~~~~~~~~~~~~~~
+
+When using the uWSGI server in combination with gevent, the Socket.IO server
+can take advantage of uWSGI's native WebSocket support.
+
+Instances of class ``socketio.Server`` will automatically use this option for
+asynchronous operations if both gevent and uWSGI are installed and eventlet is
+not installed. To request this asynchoronous mode explicitly, the
+``async_mode`` option can be given in the constructor::
+
+    # gevent with uWSGI
+    sio = socketio.Server(async_mode='gevent_uwsgi')
+
+A complete explanation of the configuration and usage of the uWSGI server is
+beyond the scope of this documentation. The uWSGI server is a fairly complex
+package that provides a large and comprehensive set of options. It must be
+compiled with WebSocket and SSL support for the WebSocket transport to be
+available. As way of an introduction, the following command starts a uWSGI
+server for the ``latency.py`` example on port 5000::
+
+    $ uwsgi --http :5000 --gevent 1000 --http-websockets --master --wsgi-file latency.py --callable app
+
 Standard Threading Library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -456,6 +513,8 @@ API Reference
 .. autoclass:: Middleware
    :members:
 .. autoclass:: Server
+   :members:
+.. autoclass:: Namespace
    :members:
 .. autoclass:: BaseManager
    :members:

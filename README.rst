@@ -43,10 +43,11 @@ Example
 The following application uses Flask to serve the HTML/Javascript to the
 client:
 
-::
+.. code:: python
 
     import socketio
     import eventlet
+    import eventlet.wsgi
     from flask import Flask, render_template
 
     sio = socketio.Server()
