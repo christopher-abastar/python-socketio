@@ -103,6 +103,7 @@ class Server(object):
 
         if client_manager is None:
             client_manager = base_manager.BaseManager()
+        self.base_manager = base_manager.BaseManager()
         self.manager = client_manager
         self.manager_initialized = False
 
@@ -175,7 +176,7 @@ class Server(object):
             namespace_handler
 
     def emit(self, event, data=None, room=None, skip_sid=None, namespace=None,
-             callback=None):
+             callback=None, base_manager=False):
         """Emit a custom event to one or more connected clients.
 
         :param event: The event name. It can be any string. The event names
@@ -204,7 +205,10 @@ class Server(object):
         namespace = namespace or '/'
         self.logger.info('emitting event "%s" to %s [%s]', event,
                          room or 'all', namespace)
-        self.manager.emit(event, data, namespace, room, skip_sid, callback)
+        if base_manager:
+            self.base_manager.emit(event, data, namespace, room, skip_sid, callback)
+        else:
+            self.manager.emit(event, data, namespace, room, skip_sid, callback)
 
     def send(self, data, room=None, skip_sid=None, namespace=None,
              callback=None):
@@ -299,10 +303,12 @@ class Server(object):
         if self.manager.is_connected(sid, namespace=namespace):
             self.logger.info('Disconnecting %s [%s]', sid, namespace)
             self.manager.pre_disconnect(sid, namespace=namespace)
+            self.base_manager.pre_disconnect(sid, namespace=namespace)
             self._send_packet(sid, packet.Packet(packet.DISCONNECT,
                                                  namespace=namespace))
             self._trigger_event('disconnect', namespace, sid)
             self.manager.disconnect(sid, namespace=namespace)
+            self.base_manager.disconnect(sid, namespace=namespace)
 
     def transport(self, sid):
         """Return the name of the transport used by the client.
@@ -331,6 +337,7 @@ class Server(object):
         if not self.manager_initialized:
             self.manager_initialized = True
             self.manager.initialize(self)
+            self.base_manager.initialize(self)
         return self.eio.handle_request(environ, start_response)
 
     def start_background_task(self, target, *args, **kwargs):
@@ -382,6 +389,7 @@ class Server(object):
             try:
                 self._trigger_event('disconnect', namespace, sid)
                 self.manager.disconnect(sid, namespace=namespace)
+                self.base_manager.disconnect(sid, namespace=namespace)
             except:
                 self.logger.error('error in _emit_internal cleanup %s', sid)
                 pass
@@ -401,9 +409,11 @@ class Server(object):
         """Handle a client connection request."""
         namespace = namespace or '/'
         self.manager.connect(sid, namespace)
+        self.base_manager.connect(sid, namespace)
         if self._trigger_event('connect', namespace, sid,
                                self.environ[sid]) is False:
             self.manager.disconnect(sid, namespace)
+            self.base_manager.disconnect(sid, namespace)
             self._send_packet(sid, packet.Packet(packet.ERROR,
                                                  namespace=namespace))
             return False
@@ -422,9 +432,11 @@ class Server(object):
             if n != '/' and self.manager.is_connected(sid, n):
                 self._trigger_event('disconnect', n, sid)
                 self.manager.disconnect(sid, n)
+                self.base_manager.disconnect(sid, n)
         if namespace == '/' and self.manager.is_connected(sid, namespace):
             self._trigger_event('disconnect', '/', sid)
             self.manager.disconnect(sid, '/')
+            self.base_manager.disconnect(sid, '/')
             if sid in self.environ:
                 del self.environ[sid]
 
